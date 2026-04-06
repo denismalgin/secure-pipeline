@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+bandit-report.json
+trivy-report.json
+pip-audit-report.json
+image.tar.gz
+.idea/
+.vscode/
+*.swp
