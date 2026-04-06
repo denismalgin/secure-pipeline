@@ -1,8 +1,0 @@
-services:
-  securepipeline:
-    image: securepipeline
-    build:
-      context: .
-      dockerfile: ./Dockerfile
-    ports:
-      - 8000:8000
