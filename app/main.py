@@ -21,7 +21,7 @@ class Item(BaseModel):
 # In-memory store, irl would have PostgreSQL
 _items: dict[int, Item] = {
     1: Item(name="Widget A", description="A reliable widget", price=9.99),
-    1: Item(name="Widget B", price=24.99, in_stock=False),
+    2: Item(name="Widget B", price=24.99, in_stock=False),
 }
 _next_id = 3
 
@@ -30,6 +30,11 @@ _next_id = 3
 def health_check():
     """Liveness probe, used by Docker HEALTHCHECK and pipeline smoke test."""
     return {"status": "ok", "version": app.version}
+
+
+@app.get("/items")
+def list_items():
+    return {"items": {k: v.model_dump() for k, v in _items.items()}}
 
 
 @app.get("/items/{item_id}")
