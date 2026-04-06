@@ -162,3 +162,79 @@ jobs:
           name: docker-image
           path: image.tar.gz
           retention-days: 1
+  deploy:
+    name: 🚀 Deploy → AWS EC2
+    runs-on: ubuntu-latest
+    needs: docker-build-scan
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+
+      - name: Retag and push to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker load < image.tar.gz
+          docker tag $IMAGE_NAME:${{ github.sha }} $ECR_REGISTRY/$IMAGE_NAME:${{ github.sha }}
+          docker tag $IMAGE_NAME:${{ github.sha }} $ECR_REGISTRY/$IMAGE_NAME:latest
+          docker push $ECR_REGISTRY/$IMAGE_NAME:${{ github.sha }}
+          docker push $ECR_REGISTRY/$IMAGE_NAME:latest
+          echo "ECR_IMAGE=$ECR_REGISTRY/$IMAGE_NAME:${{ github.sha }}" >> $GITHUB_ENV
+
+      - name: SSH deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: ECR_IMAGE,AWS_REGION,IMAGE_NAME
+          script: |
+            aws ecr get-login-password --region $AWS_REGION | \
+              docker login --username AWS --password-stdin \
+              $(echo $ECR_IMAGE | cut -d'/' -f1)
+
+            docker pull $ECR_IMAGE
+
+            docker stop ${IMAGE_NAME}-old 2>/dev/null || true
+            docker rm   ${IMAGE_NAME}-old 2>/dev/null || true
+            docker rename $IMAGE_NAME ${IMAGE_NAME}-old 2>/dev/null || true
+
+            docker run -d \
+              --name $IMAGE_NAME \
+              --restart unless-stopped \
+              -p 8000:8000 \
+              $ECR_IMAGE
+
+            for i in $(seq 1 10); do
+              STATUS=$(docker inspect --format='{{.State.Health.Status}}' $IMAGE_NAME 2>/dev/null || echo "starting")
+              [ "$STATUS" = "healthy" ] && break
+              sleep 3
+            done
+
+            docker rm -f ${IMAGE_NAME}-old 2>/dev/null || true
+            echo "Deploy complete: $ECR_IMAGE"
+
+      - name: Smoke test
+        run: |
+          sleep 5
+          curl --fail --retry 3 --retry-delay 3 \
+            http://${{ secrets.EC2_HOST }}:8000/health
+          echo "Smoke test passed"
