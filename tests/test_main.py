@@ -40,7 +40,7 @@ def test_create_item_return_201():
 
 def test_create_item_missing_price_is_422():
     r = client.post("/items", json={"name": "No Price"})
-    assert r.status_code == 422     # Pydantic validation rejects
+    assert r.status_code == 422  # Pydantic validation rejects
 
 
 def test_delete_item_then_404():
@@ -53,7 +53,3 @@ def test_delete_item_then_404():
 
 def test_delete_missing_item_is_404():
     assert client.delete("/items/9999").status_code == 404
-
-
-
-

@@ -1,13 +1,10 @@
-from typing import Optional
-
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-
 app = FastAPI(
-    title = "SecurePipeline API",
-    description = "Items API - Portfolio project, demo CI/CD with security gates.",
-    version = "1.0.0",
+    title="SecurePipeline API",
+    description="Items API - Portfolio project, demo CI/CD with security gates.",
+    version="1.0.0",
 )
 
 
@@ -38,7 +35,7 @@ def list_items():
 
 
 @app.get("/items/{item_id}")
-def get_item(item_id: int): 
+def get_item(item_id: int):
     if item_id not in _items:
         raise HTTPException(status_code=404, detail="Item not found.")
     return _items[item_id]
