@@ -1,0 +1,35 @@
+name: CI / CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  IMAGE_NAME: secure-pipeline-api
+  AWS_REGION: us-east-1
+
+jobs:
+  lint:
+    name: 🔍 Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dev deps
+        run: pip install -r requirements-dev.txt
+
+      - name: Ruff — lint + format check
+        run: ruff check . && ruff format --check .
